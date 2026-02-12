@@ -3,6 +3,11 @@ FROM docker.io/library/eclipse-temurin:21-jdk AS jre-build
 
 WORKDIR /opt/s3proxy
 
+# Install dumb-init in build stage
+RUN apt-get update && \
+    apt-get install -y dumb-init && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy the pre-computed jdeps modules list from the Maven build
 COPY target/jdeps-modules.txt /tmp/modules.txt
 
@@ -19,15 +24,13 @@ RUN jlink \
     --output /javaruntime
 
 # Stage 2: Create the final runtime image
-FROM docker.io/library/ubuntu:24.04
+FROM gcr.io/distroless/base-debian12
 LABEL maintainer="Andrew Gaul <andrew@gaul.org>"
 
 WORKDIR /opt/s3proxy
 
-# Install dumb-init
-RUN apt-get update && \
-    apt-get install -y dumb-init && \
-    rm -rf /var/lib/apt/lists/*
+# Copy dumb-init from build stage
+COPY --from=jre-build /usr/bin/dumb-init /usr/bin/dumb-init
 
 # Copy custom Java runtime from build stage
 ENV JAVA_HOME=/opt/java/openjdk
