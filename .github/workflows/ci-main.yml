@@ -149,6 +149,10 @@ jobs:
           path: target/s3proxy
       - uses: actions/upload-artifact@v6
         with:
+          name: jdeps-modules
+          path: target/jdeps-modules.txt
+      - uses: actions/upload-artifact@v6
+        with:
           name: pom
           path: pom.xml
 
@@ -160,6 +164,10 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           name: s3proxy
+          path: target
+      - uses: actions/download-artifact@v7
+        with:
+          name: jdeps-modules
           path: target
       - uses: actions/download-artifact@v7
         with:

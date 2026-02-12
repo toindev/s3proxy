@@ -1,12 +1,49 @@
-FROM docker.io/library/eclipse-temurin:21-jre
+# Stage 1: Create custom JRE with jlink
+FROM docker.io/library/eclipse-temurin:21-jdk AS jre-build
+
+WORKDIR /opt/s3proxy
+
+# Install dumb-init and busybox (for shell support) in build stage
+RUN apt-get update && \
+    apt-get install -y dumb-init busybox-static && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /busybox-bin && \
+    /usr/bin/busybox --install -s /busybox-bin
+
+# Copy the pre-computed jdeps modules list from the Maven build
+COPY target/jdeps-modules.txt /tmp/modules.txt
+
+# Display the required modules for debugging/verification
+RUN cat /tmp/modules.txt
+
+# Create a custom Java runtime with jlink
+RUN jlink \
+    --add-modules $(cat /tmp/modules.txt) \
+    --strip-debug \
+    --no-man-pages \
+    --no-header-files \
+    --compress=2 \
+    --output /javaruntime
+
+# Stage 2: Create the final runtime image
+FROM gcr.io/distroless/base-debian12
 LABEL maintainer="Andrew Gaul <andrew@gaul.org>"
 
 WORKDIR /opt/s3proxy
 
-RUN apt-get update && \
-    apt-get install -y dumb-init && \
-    rm -rf /var/lib/apt/lists/*
+# Copy dumb-init from build stage
+COPY --from=jre-build /usr/bin/dumb-init /usr/bin/dumb-init
 
+# Copy busybox binary and symlinks for shell and unix utilities
+COPY --from=jre-build /usr/bin/busybox /usr/bin/busybox
+COPY --from=jre-build /busybox-bin/ /bin/
+
+# Copy custom Java runtime from build stage
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+COPY --from=jre-build /javaruntime $JAVA_HOME
+
+# Copy application files
 COPY \
     target/s3proxy \
     src/main/resources/run-docker-container.sh \
