@@ -24,7 +24,7 @@ RUN jlink \
     --output /javaruntime
 
 # Stage 2: Create the final runtime image
-FROM gcr.io/distroless/base-debian12
+FROM ubuntu:24.04
 LABEL maintainer="Andrew Gaul <andrew@gaul.org>"
 
 WORKDIR /opt/s3proxy
@@ -42,6 +42,9 @@ COPY \
     target/s3proxy \
     src/main/resources/run-docker-container.sh \
     /opt/s3proxy/
+
+# Ensure the runtime script is executable inside the image
+RUN chmod +x /opt/s3proxy/run-docker-container.sh
 
 ENV \
     LOG_LEVEL="info" \
