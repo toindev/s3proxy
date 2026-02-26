@@ -23,9 +23,16 @@ RUN jlink \
     --compress=2 \
     --output /javaruntime
 
+# Copy CA certificates from the source JDK to the custom JRE
+# This is essential for SSL/TLS connections to AWS S3 and other HTTPS endpoints
+RUN cp $JAVA_HOME/lib/security/cacerts /javaruntime/lib/security/cacerts
+
 # Stage 2: Create the final runtime image
 FROM ubuntu:24.04
 LABEL maintainer="Andrew Gaul <andrew@gaul.org>"
+
+# update all packages in the image
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/s3proxy
 
