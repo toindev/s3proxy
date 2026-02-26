@@ -17,6 +17,7 @@ RUN cat /tmp/modules.txt
 # Create a custom Java runtime with jlink
 RUN jlink \
     --add-modules $(cat /tmp/modules.txt) \
+    --bind-services \
     --strip-debug \
     --no-man-pages \
     --no-header-files \
