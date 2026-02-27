@@ -28,7 +28,31 @@ RUN jlink \
 # This is essential for SSL/TLS connections to AWS S3 and other HTTPS endpoints
 RUN cp $JAVA_HOME/lib/security/cacerts /javaruntime/lib/security/cacerts
 
-# Stage 2: Create the final runtime image
+# Stage 2: Test stage with custom JRE to validate it works with the application tests
+FROM ubuntu:24.04 AS test
+
+WORKDIR /opt/s3proxy
+
+# Install Maven and test dependencies
+RUN apt-get update && \
+    apt-get install -y maven && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy custom Java runtime from build stage
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+COPY --from=jre-build /javaruntime $JAVA_HOME
+
+# Copy the full project for testing
+COPY pom.xml /opt/s3proxy/
+COPY src /opt/s3proxy/src/
+COPY target/s3proxy /opt/s3proxy/target/s3proxy
+COPY target/s3proxy-*-jar-with-dependencies.jar /opt/s3proxy/target/
+
+# Pre-download dependencies with the custom JRE to validate it can run Maven
+RUN mvn dependency:go-offline -B || true
+
+# Stage 3: Create the final runtime image
 FROM ubuntu:24.04
 LABEL maintainer="Andrew Gaul <andrew@gaul.org>"
 

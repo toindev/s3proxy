@@ -1,14 +1,15 @@
 name: Main CI
 
-on:
-  push:
-    branches:
-      - "master"
-    tags:
-      - "*"
-  pull_request:
-    branches:
-      - "*"
+on: push
+# on:
+#   push:
+#     branches:
+#       - "master"
+#     tags:
+#       - "*"
+#   pull_request:
+#     branches:
+#       - "*"
 
 env:
   dockerhub_publish: ${{ secrets.DOCKER_PASS != '' }}
@@ -35,7 +36,6 @@ jobs:
         with:
           images: |
             name=ghcr.io/${{ github.repository }}/container
-            name=andrewgaul/s3proxy,enable=${{ env.dockerhub_publish }}
           flavor: |
             latest=auto
           tags: |
@@ -181,17 +181,35 @@ jobs:
         with:
           name: pom
           path: .
+
+      # Test with Docker image using stripped-down JRE to ensure it can run all tests
+      - name: Build Docker test stage
+        run: |
+          docker build --target test -t s3proxy:test .
+      
+      - name: Maven Test with custom JRE (transient)
+        run: |
+          docker run --rm s3proxy:test mvn test -Ds3proxy.test.conf=s3proxy.conf -Dtest=AwsSdkTest
+
+      - name: Maven Test with custom JRE (transient-nio2)
+        run: |
+          docker run --rm s3proxy:test mvn test -Ds3proxy.test.conf=s3proxy-transient-nio2.conf -Dtest=AwsSdkTest
+
+      - name: Maven Test with custom JRE (filesystem-nio2)
+        run: |
+          docker run --rm s3proxy:test bash -c "mkdir -p /tmp/blobstore && mvn test -Ds3proxy.test.conf=s3proxy-filesystem-nio2.conf -Dtest=AwsSdkTest"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        if: github.event_name != 'pull_request' && env.dockerhub_publish == 'true'
-        with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PASS }}
+      # - name: Login to DockerHub
+      #   uses: docker/login-action@v3
+      #   if: github.event_name != 'pull_request' && env.dockerhub_publish == 'true'
+      #   with:
+      #     username: ${{ secrets.DOCKER_USER }}
+      #     password: ${{ secrets.DOCKER_PASS }}
 
       - name: Login to GHCR
         uses: docker/login-action@v3
